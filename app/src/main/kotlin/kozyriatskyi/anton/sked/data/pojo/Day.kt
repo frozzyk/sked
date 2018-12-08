@@ -8,16 +8,11 @@ import kozyriatskyi.anton.sked.data.repository.DateFormatter
 class Day(val dayNumber: Int, val weekNumber: Int, val date: String, val lessons: List<LessonDb>)
 
 class DayUi(val dayNum: Int, val weekNumber: Int, val day: String, val shortDate: String,
-                 val lessons: List<LessonUi>)
+            val lessons: List<LessonUi>)
 
 class DayMapper(private val lessonMapper: LessonMapper, private val dateFormatter: DateFormatter) {
 
     fun dbToUi(day: Day): DayUi =
             DayUi(day.dayNumber, day.weekNumber, dateFormatter.dayOfWeek(day.dayNumber),
                     dateFormatter.shortDate(day.date), lessonMapper.dbToView(day.lessons))
-
-    fun dbToUi(days: List<Day>): List<DayUi> = days.map {
-        DayUi(it.dayNumber, it.weekNumber, dateFormatter.dayOfWeek(it.dayNumber),
-                dateFormatter.shortDate(it.date), lessonMapper.dbToView(it.lessons))
-    }
 }

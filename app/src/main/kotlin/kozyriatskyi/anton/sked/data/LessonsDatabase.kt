@@ -18,6 +18,7 @@ import kozyriatskyi.anton.sked.util.logI
 abstract class LessonsDatabase : RoomDatabase() {
 
     companion object {
+        private const val DB_NAME = "lessons.db"
 
         private var INSTANCE: LessonsDatabase? = null
 
@@ -26,7 +27,7 @@ abstract class LessonsDatabase : RoomDatabase() {
                 synchronized(LessonsDatabase::class.java) {
                     if (LessonsDatabase.INSTANCE == null) {
                         LessonsDatabase.INSTANCE = Room.databaseBuilder(context.applicationContext,
-                                LessonsDatabase::class.java, "lessons.db")
+                                LessonsDatabase::class.java, DB_NAME)
                                 .addMigrations(MIGRATION_1_2)
                                 .addMigrations(MIGRATION_2_3)
                                 .addMigrations(MIGRATION_3_4)
@@ -176,7 +177,6 @@ abstract class LessonsDatabase : RoomDatabase() {
                         "FROM lessons_old;")
                 database.execSQL("DROP TABLE lessons_old;")
             }
-
         }
     }
 

@@ -13,17 +13,20 @@ class MainInteractor(private val scheduleStorage: ScheduleStorage,
                      private val scheduleLoader: ScheduleProvider,
                      private val userInfoStorage: UserInfoStorage) {
 
-    fun updateSchedule(): Completable {
-        return Single.create<List<LessonNetwork>> {
-            try {
-                val schedule = scheduleLoader.getSchedule(userInfoStorage.getUser())
+    fun updateSchedule(): Completable = Single.create<List<LessonNetwork>> {
+        try {
+            val schedule = scheduleLoader.getSchedule(userInfoStorage.getUser())
+            if (it.isDisposed.not()) {
                 it.onSuccess(schedule)
-            } catch (t: Throwable) {
+            }
+        } catch (t: Throwable) {
+            if (it.isDisposed.not()) {
                 it.onError(t)
             }
         }
-                .map(lessonMapper::networkToDb)
-                .doOnSuccess { scheduleStorage.saveLessons(it) }
-                .toCompletable()
     }
+            .map(lessonMapper::networkToDb)
+            .flatMapCompletable { lessons ->
+                Completable.fromAction { scheduleStorage.saveLessons(lessons) }
+            }
 }

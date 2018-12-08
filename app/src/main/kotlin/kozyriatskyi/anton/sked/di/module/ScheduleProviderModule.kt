@@ -5,7 +5,7 @@ import dagger.Module
 import dagger.Provides
 import kozyriatskyi.anton.sked.data.provider.ParsedStudentScheduleProvider
 import kozyriatskyi.anton.sked.data.provider.ParsedTeacherScheduleProvider
-import kozyriatskyi.anton.sked.data.repository.ParsedScheduleLoader
+import kozyriatskyi.anton.sked.data.repository.ParsedScheduleProvider
 import kozyriatskyi.anton.sked.di.App
 import kozyriatskyi.anton.sked.repository.ScheduleProvider
 import kozyriatskyi.anton.sked.repository.StudentScheduleProvider
@@ -36,6 +36,6 @@ class ScheduleProviderModule {
     @Provides
     fun provideScheduleLoader(studentScheduleLoader: Lazy<StudentScheduleProvider>,
                               teacherScheduleLoader: Lazy<TeacherScheduleProvider>): ScheduleProvider {
-        return ParsedScheduleLoader(studentScheduleLoader, teacherScheduleLoader)
+        return ParsedScheduleProvider(studentScheduleLoader, teacherScheduleLoader)
     }
 }

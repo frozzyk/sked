@@ -2,7 +2,6 @@ package kozyriatskyi.anton.sked.data.provider
 
 import kozyriatskyi.anton.sked.data.pojo.LessonNetwork
 import kozyriatskyi.anton.sked.repository.StudentScheduleProvider
-import kozyriatskyi.anton.sked.util.DateUtils
 import kozyriatskyi.anton.sutparser.StudentScheduleParser
 
 /**
@@ -10,8 +9,9 @@ import kozyriatskyi.anton.sutparser.StudentScheduleParser
  */
 class ParsedStudentScheduleProvider(private val parser: StudentScheduleParser) : StudentScheduleProvider {
 
-    override fun getSchedule(facultyId: String, courseId: String, groupId: String): List<LessonNetwork> {
-        return parser.getSchedule(facultyId, courseId, groupId, DateUtils.mondayDate(), DateUtils.sundayDate(5))
+    override fun getSchedule(facultyId: String, courseId: String, groupId: String,
+                             dateStart: String, dateEnd: String): List<LessonNetwork> {
+        return parser.getSchedule(facultyId, courseId, groupId, dateStart, dateEnd)
                 .map {
                     LessonNetwork(
                             it.date,
@@ -26,6 +26,4 @@ class ParsedStudentScheduleProvider(private val parser: StudentScheduleParser) :
                             it.whoShort)
                 }
     }
-
-
 }

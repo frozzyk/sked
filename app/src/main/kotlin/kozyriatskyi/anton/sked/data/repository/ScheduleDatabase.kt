@@ -28,9 +28,7 @@ class ScheduleDatabase(private val database: LessonsDatabase,
         timeLogger.saveTime()
     }
 
-    override fun amountOfLessonsOnDate(date: String): Observable<Int> =
-            database.scheduleDao()
-            .amountOfLessonsByDate(date)
-            .toObservable()
+    override fun getAmountOfLessonsOnDate(date: String): Observable<Int> =
+            database.scheduleDao().amountOfLessonsByDate(date).toObservable()
 }
 

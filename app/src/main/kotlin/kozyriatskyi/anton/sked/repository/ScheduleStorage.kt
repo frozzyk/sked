@@ -11,5 +11,5 @@ interface ScheduleStorage {
 
     fun saveLessons(lessons: List<LessonDb>)
 
-    fun amountOfLessonsOnDate(date: String): Observable<Int>
+    fun getAmountOfLessonsOnDate(date: String): Observable<Int>
 }

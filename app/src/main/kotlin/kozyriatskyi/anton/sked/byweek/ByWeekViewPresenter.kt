@@ -23,18 +23,19 @@ class ByWeekViewPresenter(private val interactor: ByWeekViewInteractor) : MvpPre
 
     private fun thisWeekendLessonsCount() {
         val disposable = interactor.firstWeekendLessonsCount()
+                .map { Pair(it.first != 0, it.second != 0) }
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe { (hasLessonsOnSaturday, hasLessonsOnSunday) ->
-                    val showNextWeek = showNextWeek(hasLessonsOnSaturday, hasLessonsOnSunday)
+                    val shouldShowNextWeek = shouldShowNextWeek(hasLessonsOnSaturday, hasLessonsOnSunday)
                     viewState.showWeeks(getDateTitles())
-                    if (showNextWeek) viewState.showNextWeek()
+                    if (shouldShowNextWeek) viewState.showNextWeek()
                 }
 
         disposables.add(disposable)
     }
 
-    private fun showNextWeek(hasLessonsOnSaturday: Boolean, hasLessonsOnSunday: Boolean): Boolean {
+    private fun shouldShowNextWeek(hasLessonsOnSaturday: Boolean, hasLessonsOnSunday: Boolean): Boolean {
         val c = Calendar.getInstance()
 
         val dayOfWeek = c[Calendar.DAY_OF_WEEK]
@@ -50,9 +51,9 @@ class ByWeekViewPresenter(private val interactor: ByWeekViewInteractor) : MvpPre
     }
 
     private fun getDateTitles(): Array<String> {
-        return Array(5, {
-            "${DateUtils.mondayDate(it, inShortFormat = true)} - ${DateUtils.sundayDate(it, inShortFormat = true)}"
-        })
+        return Array(6) {
+            "${DateUtils.mondayDate(it - 1, inShortFormat = true)} - ${DateUtils.sundayDate(it - 1, inShortFormat = true)}"
+        }
     }
 
     override fun onDestroy() {
