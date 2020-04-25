@@ -18,8 +18,8 @@ android {
         applicationId 'kozyriatskyi.anton.sked'
         minSdkVersion 16
         targetSdkVersion 29
-        versionCode 20
-        versionName "1.2.2"
+        versionCode 21
+        versionName "1.2.3"
         vectorDrawables.useSupportLibrary = true
 
         javaCompileOptions {
