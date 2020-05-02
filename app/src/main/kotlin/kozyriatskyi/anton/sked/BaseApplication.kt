@@ -4,16 +4,16 @@ import android.app.Application
 import android.content.Context
 import kozyriatskyi.anton.sked.util.edit
 
-open class BaseApplication : Application() {
+@Suppress("SameParameterValue")
+abstract class BaseApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
         checkAppVersion()
     }
 
-    protected open fun onApplicationUpdate(previousVersionName: String, previousVersionCode: Int,
-                                           currentVersionName: String, currentVersionCode: Int) {
-    }
+    protected abstract fun onApplicationUpdate(previousVersionName: String, previousVersionCode: Int,
+                                           currentVersionName: String, currentVersionCode: Int)
 
     private fun checkAppVersion() {
         val preferences = getSharedPreferences("versions", Context.MODE_PRIVATE)
