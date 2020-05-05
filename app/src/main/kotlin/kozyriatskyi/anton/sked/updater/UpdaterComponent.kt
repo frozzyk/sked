@@ -10,7 +10,7 @@ import kozyriatskyi.anton.sked.util.ScheduleUpdateTimeLogger
 @Updater
 @Component(dependencies = [AppComponent::class])
 interface UpdaterComponent {
-    fun inject(job: UpdaterJobService)
+    fun inject(jobSchedule: ScheduleUpdaterWorker)
 
     fun scheduleLoader(): ScheduleProvider
     fun userInfoPreferences(): UserInfoStorage

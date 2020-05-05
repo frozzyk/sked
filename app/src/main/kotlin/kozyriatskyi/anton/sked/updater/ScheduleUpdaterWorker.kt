@@ -1,6 +1,5 @@
 package kozyriatskyi.anton.sked.updater
 
-import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -11,15 +10,18 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.work.*
 import com.crashlytics.android.Crashlytics
-import com.firebase.jobdispatcher.*
 import kozyriatskyi.anton.sked.R
+import kozyriatskyi.anton.sked.data.pojo.LessonMapper
 import kozyriatskyi.anton.sked.data.repository.UserInfoStorage
 import kozyriatskyi.anton.sked.data.repository.UserSettingsStorage
 import kozyriatskyi.anton.sked.di.Injector
 import kozyriatskyi.anton.sked.main.MainActivity
 import kozyriatskyi.anton.sked.repository.ScheduleProvider
+import kozyriatskyi.anton.sked.repository.ScheduleStorage
 import kozyriatskyi.anton.sked.util.ScheduleUpdateTimeLogger
+import kozyriatskyi.anton.sked.util.logD
 import kozyriatskyi.anton.sked.util.logE
 import java.lang.Math.random
 import java.util.*
@@ -33,11 +35,14 @@ import javax.inject.Inject
 
 private const val START_HOUR = 18
 private const val END_HOUR = 20
+private const val BACKOFF_DELAY_MINS = 1L
 
-private fun startTime(calendar: Calendar): Int {
+private fun calculateStartTimeDelay(): Long {
+    val calendar = Calendar.getInstance()
+
     val startTime = calendar.let {
         it.set(Calendar.HOUR_OF_DAY, START_HOUR)
-        it.set(Calendar.MINUTE, (random() * 60).toInt())
+        it.set(Calendar.MINUTE, 0)
         it.set(Calendar.SECOND, 0)
 
         it.timeInMillis
@@ -49,54 +54,45 @@ private fun startTime(calendar: Calendar): Int {
         calendar.add(Calendar.DAY_OF_YEAR, 1)
     }
 
-    val millisFromNow = calendar.timeInMillis - System.currentTimeMillis()
+    val minsToAdd = (random() * ((END_HOUR - START_HOUR) * 60)).toInt()
+    calendar.add(Calendar.MINUTE, minsToAdd)
 
-    return TimeUnit.MILLISECONDS.toSeconds(millisFromNow).toInt()
+    return calendar.timeInMillis - System.currentTimeMillis()
 }
 
-private fun endTime(calendar: Calendar): Int {
-    calendar.set(Calendar.HOUR_OF_DAY, END_HOUR)
-    calendar.set(Calendar.MINUTE, 0)
-
-    val millisFromNow = calendar.timeInMillis - System.currentTimeMillis()
-
-    return TimeUnit.MILLISECONDS.toSeconds(millisFromNow).toInt()
-}
-
-
-class UpdaterJobService : JobService() {
+class ScheduleUpdaterWorker(context: Context, params: WorkerParameters) : Worker(context, params) {
 
     companion object {
-        private const val TAG = "UpdaterJobService"
+        private const val WORK_TAG = "ScheduleUpdaterWorker:job"
 
-        private const val OLD_CHANNEL_ID = "updater_01"
-        private const val CHANNEL_ID = "updater_02"
+        private const val NOTIFICATION_CHANNEL_ID = "updater_02"
         private const val NOTIFICATION_ID = 1
 
         fun start(context: Context) {
-            val dispatcher = FirebaseJobDispatcher(GooglePlayDriver(context))
+            val initialDelayMillis = calculateStartTimeDelay()
 
-            val calendar = Calendar.getInstance()
+            val constraints = Constraints.Builder()
+                    .setRequiredNetworkType(NetworkType.NOT_ROAMING)
+                    .build()
 
-            val startTime = startTime(calendar)
-            val endTime = endTime(calendar)
-
-            val job = dispatcher.newJobBuilder()
-                    .setService(UpdaterJobService::class.java)
-                    .setTag(TAG)
-                    .setRecurring(false)
-                    .setLifetime(Lifetime.FOREVER)
-//                    .setTrigger(Trigger.executionWindow(30, 60))
-                    .setTrigger(Trigger.executionWindow(startTime, endTime))
-                    .setReplaceCurrent(true)
-                    .setRetryStrategy(RetryStrategy.DEFAULT_LINEAR)
-                    .setConstraints(Constraint.ON_ANY_NETWORK)
+            val request = OneTimeWorkRequest.Builder(ScheduleUpdaterWorker::class.java)
+                    .setBackoffCriteria(BackoffPolicy.LINEAR, BACKOFF_DELAY_MINS, TimeUnit.MINUTES)
+                    .setConstraints(constraints)
+                    .setInitialDelay(initialDelayMillis, TimeUnit.MILLISECONDS)
                     .build()
 
             try {
-                dispatcher.mustSchedule(job)
-            } catch (e: FirebaseJobDispatcher.ScheduleFailedException) {
+                val operation = WorkManager.getInstance(context)
+                        .enqueueUniqueWork(
+                                WORK_TAG,
+                                ExistingWorkPolicy.KEEP,
+                                request
+                        )
+                operation.result.get()
+                logD("Updater work successfully scheduled")
+            } catch (e: Exception) {
                 Crashlytics.logException(e)
+                logD("Failed to schedule updater work: ${e.message}")
             }
         }
     }
@@ -105,7 +101,13 @@ class UpdaterJobService : JobService() {
     lateinit var scheduleLoader: ScheduleProvider
 
     @Inject
-    lateinit var userPreferences: UserSettingsStorage
+    lateinit var scheduleStorage: ScheduleStorage
+
+    @Inject
+    lateinit var lessonsMapper: LessonMapper
+
+    @Inject
+    lateinit var userSettingsStorage: UserSettingsStorage
 
     @Inject
     lateinit var userInfoPreferences: UserInfoStorage
@@ -113,48 +115,39 @@ class UpdaterJobService : JobService() {
     @Inject
     lateinit var timeLogger: ScheduleUpdateTimeLogger
 
-    override fun onCreate() {
+    override fun doWork(): Result {
+        //TODO move injection into WorkManagerFactory
         Injector.inject(this)
+
+        return updateSchedule().also { result -> rescheduleWorkIfNeeded(result) }
     }
 
-    override fun onStartJob(job: JobParameters): Boolean {
-        Thread {
-            try {
-                update(job)
-            } catch (ignore: Exception) {
-            }
-        }.start()
-
-        return true
-    }
-
-    override fun onStopJob(job: JobParameters): Boolean = true
-
-    private fun update(job: JobParameters): Boolean {
+    private fun updateSchedule(): Result {
         var isSuccessfullyUpdated = true
 
         try {
             val user = userInfoPreferences.getUser()
-            scheduleLoader.getSchedule(user)
+            val schedule = scheduleLoader.getSchedule(user)
+            val dbSchedule = lessonsMapper.networkToDb(schedule)
+
+            scheduleStorage.saveLessons(dbSchedule)
             timeLogger.saveTime()
         } catch (t: Throwable) {
             isSuccessfullyUpdated = false
+
             logE("Error updating schedule: ${t.message}", t)
             Crashlytics.logException(t)
         }
 
-        val notifyOnUpdate = userPreferences.getBoolean(UserSettingsStorage.KEY_NOTIFY_ON_UPDATE, true)
+        val notifyOnUpdate = userSettingsStorage.getBoolean(UserSettingsStorage.KEY_NOTIFY_ON_UPDATE, true)
 
-        if (notifyOnUpdate) sendNotification(isSuccessfullyUpdated, applicationContext)
+        if (notifyOnUpdate) {
+            sendNotification(isSuccessfullyUpdated, applicationContext)
+        }
 
-        start(applicationContext)
-
-        jobFinished(job, isSuccessfullyUpdated.not())
-
-        return isSuccessfullyUpdated
+        return if (isSuccessfullyUpdated) Result.success() else Result.retry()
     }
 
-    @SuppressLint("NewApi")
     private fun sendNotification(successfullyUpdated: Boolean, context: Context) {
         val intent = Intent(context, MainActivity::class.java)
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
@@ -169,19 +162,18 @@ class UpdaterJobService : JobService() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val chName = "Sked channel"
             val description = "Channel for all notifications"
-            val importance = NotificationManagerCompat.IMPORTANCE_MIN
+            val importance = NotificationManager.IMPORTANCE_MIN
 
-            val channel = NotificationChannel(CHANNEL_ID, chName, importance)
+            val channel = NotificationChannel(NOTIFICATION_CHANNEL_ID, chName, importance)
             channel.description = description
             channel.enableLights(true)
             channel.lightColor = Color.GREEN
 
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            notificationManager.deleteNotificationChannel(OLD_CHANNEL_ID)
             notificationManager.createNotificationChannel(channel)
         }
 
-        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
+        val builder = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_ID)
                 .setContentTitle(context.getString(R.string.notification_schedule_updated_title))
                 .setContentText(context.getString(contentTextId))
                 .setSmallIcon(R.drawable.ic_notif_update)
@@ -191,5 +183,11 @@ class UpdaterJobService : JobService() {
                 .setPriority(NotificationCompat.PRIORITY_MIN)
 
         notificationManagerCompat.notify(NOTIFICATION_ID, builder.build())
+    }
+
+    private fun rescheduleWorkIfNeeded(result: Result) {
+        if (result is Result.Success) {
+            start(applicationContext)
+        }
     }
 }

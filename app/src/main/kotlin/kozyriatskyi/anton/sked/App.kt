@@ -3,16 +3,13 @@ package kozyriatskyi.anton.sked
 import android.content.Context
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.preference.PreferenceManager
-import com.crashlytics.android.Crashlytics
-import com.firebase.jobdispatcher.FirebaseJobDispatcher
-import com.firebase.jobdispatcher.GooglePlayDriver
 import com.google.firebase.analytics.FirebaseAnalytics
 import kozyriatskyi.anton.sked.data.pojo.Student
 import kozyriatskyi.anton.sked.data.repository.UserInfoStorage
 import kozyriatskyi.anton.sked.data.repository.UserSettingsStorage
 import kozyriatskyi.anton.sked.di.Injector
 import kozyriatskyi.anton.sked.di.module.StorageModule
-import kozyriatskyi.anton.sked.updater.UpdaterJobService
+import kozyriatskyi.anton.sked.updater.ScheduleUpdaterWorker
 import kozyriatskyi.anton.sked.util.logD
 
 
@@ -55,25 +52,5 @@ class App : BaseApplication() {
         }
     }
 
-    private fun relaunchUpdaterJob() {
-        val firebaseJobDispatcher = FirebaseJobDispatcher(GooglePlayDriver(this))
-        val cancelAllResult = firebaseJobDispatcher.cancelAll()
-
-        when (cancelAllResult) {
-            FirebaseJobDispatcher.CANCEL_RESULT_SUCCESS -> {
-                Crashlytics.log("Job dispatcher cancel all result: CANCEL_RESULT_SUCCESS")
-                logD("Job dispatcher cancel all result: CANCEL_RESULT_SUCCESS")
-            }
-            FirebaseJobDispatcher.CANCEL_RESULT_UNKNOWN_ERROR -> {
-                Crashlytics.log("Job dispatcher cancel all result: CANCEL_RESULT_UNKNOWN_ERROR")
-                logD("Job dispatcher cancel all result: CANCEL_RESULT_UNKNOWN_ERROR")
-            }
-            FirebaseJobDispatcher.CANCEL_RESULT_NO_DRIVER_AVAILABLE -> {
-                Crashlytics.log("Job dispatcher cancel all result: CANCEL_RESULT_NO_DRIVER_AVAILABLE")
-                logD("Job dispatcher cancel all result: CANCEL_RESULT_NO_DRIVER_AVAILABLE")
-            }
-        }
-
-        UpdaterJobService.start(this)
-    }
+    private fun relaunchUpdaterJob() = ScheduleUpdaterWorker.start(this)
 }

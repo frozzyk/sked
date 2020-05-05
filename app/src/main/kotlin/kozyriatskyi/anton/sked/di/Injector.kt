@@ -26,7 +26,7 @@ import kozyriatskyi.anton.sked.repository.DaggerAudiencesComponent
 import kozyriatskyi.anton.sked.settings.DaggerSettingsComponent
 import kozyriatskyi.anton.sked.settings.SettingsFragment
 import kozyriatskyi.anton.sked.updater.DaggerUpdaterComponent
-import kozyriatskyi.anton.sked.updater.UpdaterJobService
+import kozyriatskyi.anton.sked.updater.ScheduleUpdaterWorker
 import kozyriatskyi.anton.sked.week.DaggerWeekViewComponent
 import kozyriatskyi.anton.sked.week.WeekViewFragment
 import kozyriatskyi.anton.sked.week.WeekViewModule
@@ -110,11 +110,11 @@ object Injector {
                 .inject(fragment)
     }
 
-    fun inject(service: UpdaterJobService) {
+    fun inject(serviceSchedule: ScheduleUpdaterWorker) {
         DaggerUpdaterComponent.builder()
                 .appComponent(appComponent)
                 .build()
-                .inject(service)
+                .inject(serviceSchedule)
     }
 
     fun inject(fragment: SettingsFragment) {
@@ -125,7 +125,7 @@ object Injector {
     }
 
     fun inject(activity: AudiencesActivity) {
-        audiencesComponent!!.inject(activity)
+        requireNotNull(audiencesComponent).inject(activity)
     }
 
     fun release(activity: AudiencesActivity) {

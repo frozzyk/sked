@@ -79,10 +79,12 @@ fun Context.toast(@StringRes id: Int, length: Int = Toast.LENGTH_LONG) {
 fun Any.logI(str: String) = Log.i(this.javaClass.simpleName, str)
 
 fun Any.logE(str: String, t: Throwable? = null, tag: String = this.javaClass.simpleName) {
-    if (t == null) {
-        Log.e(tag, str)
-    } else {
-        Log.e(tag, str, t)
+    if (BuildConfig.DEBUG) {
+        if (t == null) {
+            Log.e(tag, str)
+        } else {
+            Log.e(tag, str, t)
+        }
     }
 }
 
